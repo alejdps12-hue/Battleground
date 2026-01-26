@@ -99,6 +99,22 @@
     /* 진행바 */
     .progress-track { background: rgba(255,255,255,.08); }
     .progress-fill { background: linear-gradient(90deg, rgba(99,102,241,.9), rgba(168,85,247,.9)); }
+
+    /* 무기 선택 스크롤 영역 */
+    .options-scroll {
+      max-height: min(52vh, 360px);
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+    .options-scroll::-webkit-scrollbar { width: 8px; }
+    .options-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,.18);
+      border-radius: 999px;
+    }
+    .options-scroll::-webkit-scrollbar-track {
+      background: rgba(255,255,255,.05);
+      border-radius: 999px;
+    }
   </style>
 </head>
 
@@ -490,6 +506,7 @@
     function renderQuestionStep(qIndex) {
       const q = QUESTIONS[qIndex];
       const picked = state.answers[q.id];
+      const isWeaponPick = q.id === "q5";
 
       stepWrap.innerHTML = `
         <div class="fade-in">
@@ -497,7 +514,7 @@
           <h2 class="mt-1 text-xl md:text-2xl font-semibold tracking-tight">${escapeHtml(q.title)}</h2>
           <p class="mt-2 text-sm text-zinc-300">가장 가까운 걸 하나 고르세요.</p>
 
-          <div class="mt-5 grid gap-3">
+          <div class="mt-5 grid gap-3 ${isWeaponPick ? "options-scroll" : ""}">
             ${q.options.map((o, i) => {
               const isActive = picked === o.value;
               return `
