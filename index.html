@@ -698,7 +698,11 @@
             <div class="mt-3 space-y-2">
               ${ranking.map(r => {
                 const max = ranking[0].score || 1;
-                const pct = Math.round((r.score / max) * 100);
+                const raw = r.score / max;
+                const eased = Math.pow(raw, 0.6);
+                let pct = Math.round(eased * 100);
+                if (r.score === 0) pct = 4;
+                else if (pct < 8) pct = 8;
                 return `
                   <div class="rounded-2xl border border-white/10 bg-white/5 p-3">
                     <div class="flex items-center justify-between">
