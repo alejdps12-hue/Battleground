@@ -115,6 +115,76 @@
       background: rgba(255,255,255,.05);
       border-radius: 999px;
     }
+
+    /* 로딩 모달 (레이더/스캔 느낌) */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      background: rgba(6,8,6,.72);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+    .loading-panel {
+      width: min(520px, 92vw);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(9,11,9,.92);
+      box-shadow: 0 30px 90px rgba(0,0,0,.55);
+      overflow: hidden;
+      position: relative;
+    }
+    .loading-scan {
+      position: absolute;
+      inset: -60% 10%;
+      background: conic-gradient(from 180deg, rgba(90,255,160,.0), rgba(90,255,160,.18), rgba(90,255,160,.0) 60%);
+      animation: scan-rotate 2.6s linear infinite;
+      filter: blur(1px);
+    }
+    .loading-grid {
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(0deg, rgba(90,255,160,.08) 0 1px, transparent 1px 16px),
+        repeating-linear-gradient(90deg, rgba(90,255,160,.08) 0 1px, transparent 1px 16px);
+      opacity: .35;
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+    .loading-core {
+      position: relative;
+      padding: 28px 28px 24px;
+    }
+    .loading-ping {
+      width: 84px;
+      height: 84px;
+      border-radius: 999px;
+      border: 1px solid rgba(90,255,160,.5);
+      box-shadow: 0 0 30px rgba(90,255,160,.35);
+      display: grid;
+      place-items: center;
+      margin: 0 auto 18px;
+      position: relative;
+    }
+    .loading-ping::after {
+      content: "";
+      position: absolute;
+      inset: -12px;
+      border-radius: inherit;
+      border: 1px solid rgba(90,255,160,.25);
+      animation: ping 1.6s ease-out infinite;
+    }
+    @keyframes scan-rotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes ping {
+      0% { transform: scale(.7); opacity: .2; }
+      70% { transform: scale(1.2); opacity: .6; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
   </style>
 </head>
 
@@ -403,7 +473,8 @@
     const state = {
       step: 0,
       answers: {},     // { qid: option.value }
-      scores: {}       // weaponId -> score
+      scores: {},      // weaponId -> score
+      isLoading: false
     };
 
     function resetScores() {
@@ -676,7 +747,8 @@
 
         const q = QUESTIONS[state.step];
         nextBtn.textContent = (state.step === QUESTIONS.length - 1) ? "결과 보기" : "다음";
-        nextBtn.disabled = !state.answers[q.id];
+        nextBtn.disabled = !state.answers[q.id] || state.isLoading;
+        if (state.isLoading) prevBtn.disabled = true;
       } else {
         // result
         renderResult();
@@ -684,6 +756,37 @@
         nextBtn.disabled = true;
         prevBtn.disabled = true;
       }
+    }
+
+    function showLoading(done) {
+      if (state.isLoading) return;
+      state.isLoading = true;
+      render();
+
+      const overlay = document.createElement("div");
+      overlay.id = "loadingOverlay";
+      overlay.className = "loading-overlay";
+      overlay.innerHTML = `
+        <div class="loading-panel">
+          <div class="loading-scan"></div>
+          <div class="loading-grid"></div>
+          <div class="loading-core">
+            <div class="text-xs text-emerald-300/80 tracking-[.3em] text-center">SCAN</div>
+            <div class="loading-ping">
+              <div class="h-3 w-3 rounded-full bg-emerald-300 shadow-[0_0_16px_rgba(90,255,160,.8)]"></div>
+            </div>
+            <div class="text-center text-zinc-100 text-lg font-semibold">전장 성향 분석중…</div>
+            <div class="mt-2 text-center text-xs text-zinc-400">신호 수집 · 전술 패턴 매칭</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      setTimeout(() => {
+        overlay.remove();
+        state.isLoading = false;
+        done();
+      }, 1500);
     }
 
     // -----------------------------
@@ -698,6 +801,13 @@
       if (state.step < QUESTIONS.length) {
         const q = QUESTIONS[state.step];
         if (!state.answers[q.id]) return;
+        if (state.step === QUESTIONS.length - 1) {
+          showLoading(() => {
+            state.step++;
+            render();
+          });
+          return;
+        }
         state.step++;
         render();
       }
