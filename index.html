@@ -1,14 +1,783 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World</title>
-  <link href='/style.css' rel='stylesheet'>
+  <title>PUBG 총기 성격 테스트</title>
+
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    :root { color-scheme: dark; }
+    /* 전쟁터 이미지 배경 */
+    body {
+      position: relative;
+      background:
+        linear-gradient(180deg, rgba(7,8,6,.78) 0%, rgba(9,10,8,.72) 45%, rgba(6,7,5,.82) 100%),
+        url("images/battleground.jpg");
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: -10%;
+      pointer-events: none;
+      z-index: -1;
+    }
+    /* 연기층 */
+    body::before {
+      background:
+        radial-gradient(700px 400px at 30% 20%, rgba(60,60,60,.35), transparent 60%),
+        radial-gradient(900px 500px at 70% 10%, rgba(50,50,50,.30), transparent 65%),
+        radial-gradient(1100px 700px at 50% 80%, rgba(40,40,40,.28), transparent 70%);
+      filter: blur(8px);
+      opacity: .9;
+      animation: smoke-drift 18s ease-in-out infinite alternate;
+    }
+    /* 먼지/재 느낌 */
+    body::after {
+      background:
+        repeating-linear-gradient(120deg, rgba(255,255,255,.03) 0 2px, transparent 2px 6px),
+        radial-gradient(2px 2px at 20% 30%, rgba(255,200,120,.18), transparent 60%),
+        radial-gradient(2px 2px at 60% 70%, rgba(255,170,90,.16), transparent 60%),
+        radial-gradient(2px 2px at 80% 40%, rgba(255,190,110,.14), transparent 60%);
+      opacity: .6;
+      mix-blend-mode: screen;
+    }
+    @keyframes smoke-drift {
+      0% { transform: translateY(0) translateX(0); }
+      100% { transform: translateY(-2%) translateX(2%); }
+    }
+    .glass {
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow: 0 20px 80px rgba(0,0,0,.45);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .shine {
+      position: relative;
+      overflow: hidden;
+    }
+    .shine::after{
+      content:"";
+      position:absolute;
+      inset:-200% -200%;
+      background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,.12) 50%, transparent 70%);
+      transform: rotate(20deg);
+      animation: sheen 6.5s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes sheen{
+      0% { transform: translateX(-20%) rotate(20deg); }
+      100% { transform: translateX(20%) rotate(20deg); }
+    }
+    .fade-in { animation: fade .5s ease-out both; }
+    @keyframes fade { from { opacity:0; transform: translateY(10px);} to { opacity:1; transform:none; } }
+
+    /* 별/먼지 파티클 캔버스 */
+    canvas#stars {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      opacity: .75;
+    }
+
+    /* 선택 카드 호버 */
+    .pick:hover { transform: translateY(-2px); }
+    .pick { transition: transform .15s ease, border-color .15s ease, background .15s ease; }
+    .pick.active {
+      border-color: rgba(99,102,241,.8) !important;
+      background: rgba(99,102,241,.12) !important;
+    }
+
+    /* 진행바 */
+    .progress-track { background: rgba(255,255,255,.08); }
+    .progress-fill { background: linear-gradient(90deg, rgba(99,102,241,.9), rgba(168,85,247,.9)); }
+  </style>
 </head>
-<body>
-  <h1>Hello, world!</h1>
-  <button onclick="console.log('hello');">Press me</button>
-  <script defer type="text/javascript" src="/main.js"></script>
+
+<body class="min-h-screen text-zinc-100 selection:bg-indigo-500/30">
+  <canvas id="stars"></canvas>
+
+  <main class="mx-auto max-w-5xl px-4 py-10 md:py-16">
+    <!-- Header -->
+    <header class="mb-10 md:mb-14">
+      <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-200">
+        <span class="h-2 w-2 rounded-full bg-indigo-400 shadow-[0_0_18px_rgba(99,102,241,.9)]"></span>
+        PUBG Weapon Personality Test
+      </div>
+      <h1 class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight">
+        배틀그라운드 <span class="text-indigo-300">총기별</span> 성격 테스트
+      </h1>
+      <p class="mt-3 max-w-2xl text-zinc-300">
+        당신이 사랑하는 총 한 자루로 플레이 스타일과 성향을 해석합니다. (가볍게 즐겨요)
+      </p>
+    </header>
+
+    <!-- Layout -->
+    <section class="grid gap-6 lg:grid-cols-[1.25fr_.75fr]">
+      <!-- Card -->
+      <div class="glass shine rounded-3xl p-5 md:p-7">
+        <!-- Top bar -->
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="text-xs text-zinc-300">진행 상황</div>
+            <div class="mt-2 h-2 w-56 max-w-full rounded-full progress-track">
+              <div id="progressFill" class="h-2 w-[20%] rounded-full progress-fill"></div>
+            </div>
+          </div>
+          <button id="resetBtn"
+            class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 hover:bg-white/10 active:scale-[.99] transition">
+            리셋
+          </button>
+        </div>
+
+        <!-- Steps -->
+        <div id="stepWrap" class="mt-6 space-y-6">
+          <!-- Step content injected -->
+        </div>
+
+        <!-- Nav -->
+        <div class="mt-8 flex items-center justify-between">
+          <button id="prevBtn"
+            class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-200 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-white/5 transition">
+            이전
+          </button>
+
+          <div class="flex items-center gap-2">
+            <span id="stepHint" class="text-xs text-zinc-400"></span>
+          </div>
+
+          <button id="nextBtn"
+            class="rounded-2xl bg-indigo-500/90 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 active:scale-[.99] transition disabled:opacity-40 disabled:hover:bg-indigo-500/90">
+            다음
+          </button>
+        </div>
+      </div>
+
+      <!-- Side -->
+      <aside class="space-y-6">
+        <div class="glass rounded-3xl p-5 md:p-6">
+          <div class="text-sm font-medium text-zinc-100">테스트 규칙</div>
+          <ul class="mt-3 space-y-2 text-sm text-zinc-300 list-disc pl-5">
+            <li>각 문항에서 가장 “나답다”를 고르기</li>
+            <li>총기 선택은 가장 좋아하는/자주 쓰는 기준</li>
+            <li>결과는 플레이 성향 + 성격 비유</li>
+          </ul>
+          <div class="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-zinc-300">
+            Tip: 결과 화면에서 공유 링크를 복사할 수 있어요.
+          </div>
+        </div>
+
+        <div class="glass rounded-3xl p-5 md:p-6">
+          <div class="text-sm font-medium text-zinc-100">선택한 것</div>
+          <div id="summary" class="mt-3 space-y-2 text-sm text-zinc-300">
+            <!-- summary injected -->
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="mt-10 text-center text-xs text-zinc-500">
+      © <span id="year"></span> PUBG Weapon Personality Test · fan-made UI demo
+    </footer>
+  </main>
+
+  <script>
+    // -----------------------------
+    // Data
+    // -----------------------------
+    const WEAPONS = [
+      // AR
+      { id: "m416", name: "M416", tag: "밸런스의 정석", vibe: "유연 · 안정 · 최적화",
+        summary: "상황 적응력 최상. ‘무난함’이 아니라 ‘완성도’를 택하는 타입.",
+        strengths: ["밸런스 감각", "팀플 조율", "위기 대처"], watchout: ["안전지향이 과하면 타이밍 놓침", "결단이 늦어질 수 있음"],
+        motto: "흔들리지 않는 기본기.", color: "indigo" },
+      { id: "beryl", name: "Beryl M762", tag: "하이리스크 하이리턴", vibe: "공격 · 스릴 · 과감",
+        summary: "폭발적 순간 화력. 기회가 오면 과감히 밀어붙이는 승부사.",
+        strengths: ["결단력", "교전 집중력", "역전력"], watchout: ["조급함", "리코일/컨디션 변수"],
+        motto: "질서보다 돌파.", color: "rose" },
+      { id: "akm", name: "AKM", tag: "클래식 고집", vibe: "단단 · 묵직 · 현실",
+        summary: "화려함보다 확실함. 손에 익은 루틴으로 결과를 만드는 타입.",
+        strengths: ["멘탈 안정", "자기 페이스", "지속력"], watchout: ["메타 적응이 느릴 수 있음", "고집"],
+        motto: "내가 익힌 길이 답.", color: "amber" },
+      { id: "scar", name: "SCAR-L", tag: "기본기 충실", vibe: "담백 · 균형 · 침착",
+        summary: "과하지 않게 ‘필요한 만큼’ 해내는 타입. 안정적이며 팀이 믿기 쉬움.",
+        strengths: ["침착함", "중거리 교전", "리듬 유지"], watchout: ["임팩트 부족하단 소리 들을 수 있음"],
+        motto: "꾸준함은 배신하지 않는다.", color: "zinc" },
+      { id: "aug", name: "AUG A3", tag: "완성형 스펙", vibe: "깔끔 · 자신감 · 효율",
+        summary: "좋은 도구를 제대로 활용. 준비된 사람처럼 결과를 뽑아내는 타입.",
+        strengths: ["효율적 선택", "정교한 운영", "평균 이상 유지"], watchout: ["환경 탓을 하게 될 수 있음"],
+        motto: "좋은 장비는 실력의 증폭기.", color: "violet" },
+      { id: "g36c", name: "G36C", tag: "틈새 최적화", vibe: "실험 · 적응 · 냉정",
+        summary: "익숙한 걸 답습하기보다, 맵/상황에 맞춰 최선의 답을 찾는 타입.",
+        strengths: ["적응력", "새 루트 개척", "상황 판단"], watchout: ["과실험으로 루틴이 흔들릴 수 있음"],
+        motto: "맵이 답을 알려준다.", color: "emerald" },
+      { id: "qbz", name: "QBZ", tag: "차분한 안정", vibe: "정돈 · 절제 · 꾸준",
+        summary: "큰 소리 없이 성과를 내는 타입. 팀에 ‘안정감’을 준다.",
+        strengths: ["안정 교전", "리스크 관리", "멘탈"], watchout: ["속도전에서 답답해 보일 수 있음"],
+        motto: "조용히 이기자.", color: "teal" },
+      { id: "k2", name: "K2", tag: "국밥 감성", vibe: "실용 · 현실 · 담백",
+        summary: "군더더기 없이 실속 챙김. ‘되는 걸 한다’는 실용주의.",
+        strengths: ["현실적 선택", "유지력", "컨트롤"], watchout: ["새로운 시도에 보수적일 수 있음"],
+        motto: "검증된 게 최고.", color: "amber" },
+
+      // SMG
+      { id: "ump", name: "UMP45", tag: "안전한 교전 설계", vibe: "실리 · 통제 · 꾸준",
+        summary: "전투를 ‘운’이 아니라 ‘설계’로 이김. 리스크 최소화 전문가.",
+        strengths: ["포지셔닝", "중거리 안정", "확률 관리"], watchout: ["과한 안정 추구", "피니시가 늦어질 수 있음"],
+        motto: "이길 싸움만 한다.", color: "emerald" },
+      { id: "vector", name: "Vector", tag: "근접 분쇄기", vibe: "속도 · 압박 · 집중",
+        summary: "초근접에서 폭발하는 타입. 찰나의 판단이 모든 걸 가른다.",
+        strengths: ["순간 화력", "침투", "피니시"], watchout: ["탄 관리", "거리 늘어나면 약해짐"],
+        motto: "붙으면 끝.", color: "rose" },
+      { id: "mp5k", name: "MP5K", tag: "도시형 안정", vibe: "정교 · 단단 · 균형",
+        summary: "컨트롤 좋은 효율형. 난전에서 실수가 적다.",
+        strengths: ["제어력", "난전 대응", "꾸준함"], watchout: ["과감한 한 방이 부족할 수 있음"],
+        motto: "정확하게, 빠르게.", color: "sky" },
+      { id: "bizon", name: "PP-19 Bizon", tag: "탄창이 마음", vibe: "여유 · 안정 · 관리",
+        summary: "‘탄 걱정 없는 안정감’을 사랑하는 타입. 실수도 커버하는 운영형.",
+        strengths: ["지속 교전", "실수 커버", "멘탈"], watchout: ["화력이 부족하단 느낌"],
+        motto: "여유가 실력.", color: "cyan" },
+      { id: "uzi", name: "Micro UZI", tag: "날카로운 근접", vibe: "즉흥 · 스피드 · 공격",
+        summary: "판단 빠르고 대담. 결과도 빠르게 낸다.",
+        strengths: ["돌파력", "스피드", "근접 교전"], watchout: ["성급함", "사거리 의존"],
+        motto: "빠른 게 정의.", color: "fuchsia" },
+      { id: "tommy", name: "Tommy Gun", tag: "낭만 근접", vibe: "개성 · 감각 · 플레이",
+        summary: "정답보다 재미와 스타일. ‘나만의 플레이’를 중요시.",
+        strengths: ["개성", "난전 적응", "멘탈"], watchout: ["효율만 따지면 손해 볼 수 있음"],
+        motto: "멋이 곧 힘.", color: "amber" },
+      { id: "p90", name: "P90 (Care Package)", tag: "스페셜리스트", vibe: "희소 · 자신감 · 과감",
+        summary: "흔치 않은 기회를 잡아 자기 색으로 터뜨리는 타입.",
+        strengths: ["기회 포착", "근접 교전", "자기 확신"], watchout: ["과감함이 무모함으로 바뀔 수 있음"],
+        motto: "기회는 잡는 자의 것.", color: "fuchsia" },
+
+      // DMR
+      { id: "sks", name: "SKS", tag: "정밀 집착", vibe: "분석 · 예측 · 기술",
+        summary: "관찰 → 계산 → 실행. 머리로 교전을 푸는 전술가 타입.",
+        strengths: ["판단력", "거리/각 관리", "정보 수집"], watchout: ["생각이 길어질 수 있음", "돌발 변수에 약할 수 있음"],
+        motto: "각이 보이면 끝.", color: "violet" },
+      { id: "mini14", name: "Mini14", tag: "속사 정밀", vibe: "깔끔 · 리듬 · 효율",
+        summary: "리듬감 있게 누적딜. 실수를 줄이며 확실히 이기는 타입.",
+        strengths: ["견제", "탄속 활용", "연사 안정"], watchout: ["한 방 임팩트 부족"],
+        motto: "꾸준히 쌓아서 끝낸다.", color: "indigo" },
+      { id: "slr", name: "SLR", tag: "강한 한 발", vibe: "고집 · 정확 · 공격",
+        summary: "‘쎄게 맞추는’ 걸 좋아함. 타협보다 성능을 택한다.",
+        strengths: ["압박", "대미지 기대값", "교전 주도"], watchout: ["난이도", "욕심"],
+        motto: "세게, 정확하게.", color: "rose" },
+      { id: "mk12", name: "Mk12", tag: "현대적 안정", vibe: "침착 · 균형 · 세련",
+        summary: "안정적으로 라인 잡고 적을 묶는다. 팀을 편하게 만드는 타입.",
+        strengths: ["견제", "안정 딜링", "포지션 유지"], watchout: ["공격 타이밍을 놓칠 수 있음"],
+        motto: "흔들리지 말자.", color: "emerald" },
+      { id: "qbu", name: "QBU", tag: "숲의 계산가", vibe: "관찰 · 각 · 냉정",
+        summary: "환경을 읽고 최적의 사선을 만든다. 계산이 빠른 타입.",
+        strengths: ["각 설계", "정보전", "원거리 운영"], watchout: ["예상 밖 변수가 싫음"],
+        motto: "보이면 이미 끝.", color: "teal" },
+
+      // SR
+      { id: "kar98", name: "Kar98k / M24", tag: "원샷 미학", vibe: "집중 · 감각 · 낭만",
+        summary: "한 방에 모든 걸 거는 집중력. ‘결정적 순간’에 강한 타입.",
+        strengths: ["몰입력", "타이밍 감각", "심리전"], watchout: ["기복", "확률 낮은 선택에 올인"],
+        motto: "한 발이면 충분해.", color: "sky" },
+      { id: "awm", name: "AWM (Care Package)", tag: "절대 권위", vibe: "압도 · 자신감 · 결말",
+        summary: "‘끝내는 힘’을 선호. 결정권을 쥐고 게임을 접는 타입.",
+        strengths: ["결정력", "원샷 압박", "존재감"], watchout: ["권위가 독선으로 보일 수 있음"],
+        motto: "한 번에 마무리.", color: "violet" },
+      { id: "mosin", name: "Mosin Nagant", tag: "정통 저격", vibe: "집요 · 정밀 · 인내",
+        summary: "한 번의 기회를 위해 길게 준비. 인내심 강한 타입.",
+        strengths: ["집중력", "인내", "포지션 플레이"], watchout: ["기회 올인", "루즈해질 수 있음"],
+        motto: "기다림도 실력.", color: "indigo" },
+
+      // LMG
+      { id: "m249", name: "M249", tag: "제압의 상징", vibe: "압박 · 유지 · 통제",
+        summary: "상대 움직임을 ‘막아’버리는 타입. 공간을 지배한다.",
+        strengths: ["제압", "연막/견제", "라인 유지"], watchout: ["욕심내다 포지션 노출"],
+        motto: "움직이면 맞는다.", color: "emerald" },
+      { id: "dp28", name: "DP-28", tag: "묵직한 제압", vibe: "단단 · 버팀 · 끈기",
+        summary: "느리지만 강한 지속력. 오래 버티고 길게 이긴다.",
+        strengths: ["버팀", "라인전", "멘탈"], watchout: ["기동력 부족"],
+        motto: "버티면 이긴다.", color: "amber" },
+
+      // Shotgun
+      { id: "s12k", name: "S12K", tag: "근접 난전", vibe: "즉발 · 과감 · 폭발",
+        summary: "좁은 공간에서 확실히 끝내는 타입. 대담하고 빠르다.",
+        strengths: ["근접 클리어", "돌입", "난전"], watchout: ["거리 늘면 급격히 불리"],
+        motto: "문 열면 끝.", color: "rose" },
+      { id: "dbs", name: "DBS", tag: "2연속 확정", vibe: "결단 · 피니시 · 압박",
+        summary: "확실한 마무리 선호. ‘끝장’에 강한 타입.",
+        strengths: ["피니시", "근접 교전", "심리 압박"], watchout: ["사거리 의존"],
+        motto: "마무리는 확실하게.", color: "violet" },
+      { id: "s686", name: "S686", tag: "클래식 2연발", vibe: "정확 · 담력 · 집중",
+        summary: "실수 없는 두 발. 침착하게 끝내는 타입.",
+        strengths: ["정확도", "담력", "순간 판단"], watchout: ["실수 시 리스크 큼"],
+        motto: "두 발로 정리.", color: "sky" },
+
+      // Pistols / Misc (재미용)
+      { id: "deagle", name: "Desert Eagle", tag: "간지 한 방", vibe: "자신감 · 낭만 · 쇼맨",
+        summary: "비효율이어도 멋을 챙김. ‘폼’이 실력인 타입.",
+        strengths: ["자신감", "클러치", "임팩트"], watchout: ["현실성이 떨어질 수 있음"],
+        motto: "한 방에 증명.", color: "amber" },
+      { id: "crossbow", name: "석궁", tag: "조용한 집착", vibe: "은밀 · 집요 · 변칙",
+        summary: "평범함 거부. 조용히 흔들어 놓는 변칙 플레이어.",
+        strengths: ["기습", "심리전", "창의성"], watchout: ["난이도", "대응력 요구"],
+        motto: "소리 없이 끝낸다.", color: "emerald" }
+    ];
+
+    const QUESTIONS = [
+      {
+        id: "q1",
+        title: "1) 당신의 ‘승리’ 기준은?",
+        options: [
+          { value: "safe", label: "안정적으로 생존 + 꾸준히 상위권", weight: { m416: 2, ump: 3, akm: 1 } },
+          { value: "frags", label: "킬이 곧 재미. 하이라이트가 승리", weight: { beryl: 3, p90: 2, kar98: 1 } },
+          { value: "smart", label: "각/운영으로 이기는 ‘깔끔한’ 승리", weight: { sks: 3, m416: 2, ump: 1 } },
+          { value: "clutch", label: "결정적 한 방(헤드샷/클러치)으로 끝", weight: { kar98: 3, sks: 2, beryl: 1 } }
+        ]
+      },
+      {
+        id: "q2",
+        title: "2) 교전이 열렸을 때 당신은?",
+        options: [
+          { value: "push", label: "바로 압박. 선빵이 답", weight: { beryl: 3, p90: 2, ump: 1 } },
+          { value: "hold", label: "각 잡고 기다렸다 확실할 때", weight: { sks: 2, kar98: 2, ump: 1 } },
+          { value: "flex", label: "상황 보며 유연하게 (연막/각변/리로드)", weight: { m416: 3, ump: 1, sks: 1 } },
+          { value: "route", label: "교전 피하고 더 좋은 자리로 재배치", weight: { ump: 3, akm: 2, m416: 1 } }
+        ]
+      },
+      {
+        id: "q3",
+        title: "3) 당신이 가장 싫어하는 건?",
+        options: [
+          { value: "rng", label: "운빨/변수로 계획이 틀어지는 것", weight: { sks: 3, ump: 2, m416: 1 } },
+          { value: "slow", label: "루즈한 템포, 답답한 운영", weight: { beryl: 2, p90: 2, kar98: 1 } },
+          { value: "change", label: "갑작스런 메타 변화 / 낯선 세팅", weight: { akm: 3, m416: 1, ump: 1 } },
+          { value: "miss", label: "결정적 순간의 미스/실수", weight: { kar98: 3, sks: 1, m416: 1 } }
+        ]
+      },
+      {
+        id: "q4",
+        title: "4) 팀플에서 당신의 포지션은?",
+        options: [
+          { value: "igl", label: "오더/콜. 전체 그림을 본다", weight: { sks: 2, m416: 2, ump: 1 } },
+          { value: "entry", label: "엔트리. 첫 교전 열고 판 흔든다", weight: { beryl: 3, p90: 2, m416: 1 } },
+          { value: "anchor", label: "앵커. 뒤를 지키고 안정감 제공", weight: { ump: 3, akm: 2, m416: 1 } },
+          { value: "sniper", label: "저격/견제. 흐름을 끊는다", weight: { kar98: 3, sks: 2, m416: 1 } }
+        ]
+      },
+      {
+        id: "q5",
+        title: "5) 마지막! 당신의 ‘최애 총기’는?",
+        options: WEAPONS.map(w => ({
+          value: w.id,
+          label: `${w.name} — ${w.tag}`,
+          weight: { [w.id]: 6 } // 최애는 강하게 반영
+        }))
+      }
+    ];
+
+    // -----------------------------
+    // State
+    // -----------------------------
+    const state = {
+      step: 0,
+      answers: {},     // { qid: option.value }
+      scores: {}       // weaponId -> score
+    };
+
+    function resetScores() {
+      state.scores = {};
+      for (const w of WEAPONS) state.scores[w.id] = 0;
+    }
+    resetScores();
+
+    // -----------------------------
+    // DOM
+    // -----------------------------
+    const stepWrap = document.getElementById("stepWrap");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const summaryEl = document.getElementById("summary");
+    const progressFill = document.getElementById("progressFill");
+    const stepHint = document.getElementById("stepHint");
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    // -----------------------------
+    // Utils
+    // -----------------------------
+    function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+
+    function computeScoresFromAnswers() {
+      resetScores();
+      for (const q of QUESTIONS) {
+        const picked = state.answers[q.id];
+        if (!picked) continue;
+        const opt = q.options.find(o => o.value === picked);
+        if (!opt) continue;
+        for (const [wid, val] of Object.entries(opt.weight || {})) {
+          if (state.scores[wid] == null) state.scores[wid] = 0;
+          state.scores[wid] += val;
+        }
+      }
+    }
+
+    function topWeapon() {
+      computeScoresFromAnswers();
+      let best = WEAPONS[0];
+      let bestScore = -Infinity;
+      for (const w of WEAPONS) {
+        const s = state.scores[w.id] ?? 0;
+        if (s > bestScore) { bestScore = s; best = w; }
+      }
+      return { weapon: best, score: bestScore };
+    }
+
+    function scoreRanking() {
+      computeScoresFromAnswers();
+      const arr = WEAPONS.map(w => ({ ...w, score: state.scores[w.id] ?? 0 }));
+      arr.sort((a,b) => b.score - a.score);
+      return arr;
+    }
+
+    function setProgress() {
+      const total = QUESTIONS.length;
+      const pct = Math.round(((state.step + 1) / (total + 1)) * 100); // 결과 포함 느낌
+      progressFill.style.width = clamp(pct, 8, 100) + "%";
+      stepHint.textContent = state.step < QUESTIONS.length
+        ? `문항 ${state.step + 1} / ${QUESTIONS.length}`
+        : "결과";
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    // -----------------------------
+    // Render
+    // -----------------------------
+    function renderSummary() {
+      const entries = QUESTIONS.map(q => {
+        const val = state.answers[q.id];
+        if (!val) return null;
+        const opt = q.options.find(o => o.value === val);
+        return { title: q.title, choice: opt?.label || val };
+      }).filter(Boolean);
+
+      if (!entries.length) {
+        summaryEl.innerHTML = `<div class="text-zinc-400">아직 선택이 없어요.</div>`;
+        return;
+      }
+
+      summaryEl.innerHTML = entries.map(e => `
+        <div class="rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div class="text-xs text-zinc-400">${escapeHtml(e.title)}</div>
+          <div class="mt-1 text-sm text-zinc-200">${escapeHtml(e.choice)}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderQuestionStep(qIndex) {
+      const q = QUESTIONS[qIndex];
+      const picked = state.answers[q.id];
+
+      stepWrap.innerHTML = `
+        <div class="fade-in">
+          <div class="text-sm text-zinc-300">선택형</div>
+          <h2 class="mt-1 text-xl md:text-2xl font-semibold tracking-tight">${escapeHtml(q.title)}</h2>
+          <p class="mt-2 text-sm text-zinc-300">가장 가까운 걸 하나 고르세요.</p>
+
+          <div class="mt-5 grid gap-3">
+            ${q.options.map((o, i) => {
+              const isActive = picked === o.value;
+              return `
+                <button
+                  data-qid="${escapeHtml(q.id)}"
+                  data-value="${escapeHtml(o.value)}"
+                  class="pick text-left rounded-2xl border ${isActive ? "active" : "border-white/10"} bg-white/5 hover:bg-white/10 px-4 py-4"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div>
+                      <div class="text-sm md:text-base font-medium text-zinc-100">${escapeHtml(o.label)}</div>
+                      <div class="mt-1 text-xs text-zinc-400">Option ${i + 1}</div>
+                    </div>
+                    <span class="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs text-zinc-200">
+                      ${isActive ? "✓" : ""}
+                    </span>
+                  </div>
+                </button>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      `;
+
+      // attach handlers
+      stepWrap.querySelectorAll("button.pick").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const qid = btn.getAttribute("data-qid");
+          const value = btn.getAttribute("data-value");
+          state.answers[qid] = value;
+
+          // re-render to reflect active styles
+          render();
+        });
+      });
+    }
+
+    function renderResult() {
+      const { weapon } = topWeapon();
+      const ranking = scoreRanking();
+      const second = ranking[1];
+
+      // share payload via URL hash (simple)
+      const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
+        result: weapon.id,
+        answers: state.answers
+      }))));
+
+      const shareUrl = `${location.origin}${location.pathname}#r=${payload}`;
+
+      stepWrap.innerHTML = `
+        <div class="fade-in">
+          <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-200">
+            <span class="h-2 w-2 rounded-full bg-indigo-400 shadow-[0_0_18px_rgba(99,102,241,.9)]"></span>
+            RESULT
+          </div>
+
+          <h2 class="mt-4 text-2xl md:text-3xl font-semibold tracking-tight">
+            당신의 총기는 <span class="text-indigo-300">${escapeHtml(weapon.name)}</span>
+          </h2>
+
+          <p class="mt-3 text-zinc-300">${escapeHtml(weapon.summary)}</p>
+
+          <div class="mt-6 grid gap-4 md:grid-cols-2">
+            <div class="rounded-3xl border border-white/10 bg-white/5 p-5">
+              <div class="text-sm font-medium text-zinc-100">핵심 분위기</div>
+              <div class="mt-2 text-sm text-zinc-300">${escapeHtml(weapon.vibe)}</div>
+              <div class="mt-4 text-sm font-medium text-zinc-100">모토</div>
+              <div class="mt-2 text-sm text-zinc-200">“${escapeHtml(weapon.motto)}”</div>
+            </div>
+
+            <div class="rounded-3xl border border-white/10 bg-white/5 p-5">
+              <div class="text-sm font-medium text-zinc-100">강점</div>
+              <ul class="mt-2 space-y-1 text-sm text-zinc-300 list-disc pl-5">
+                ${weapon.strengths.map(s => `<li>${escapeHtml(s)}</li>`).join("")}
+              </ul>
+              <div class="mt-4 text-sm font-medium text-zinc-100">주의 포인트</div>
+              <ul class="mt-2 space-y-1 text-sm text-zinc-300 list-disc pl-5">
+                ${weapon.watchout.map(s => `<li>${escapeHtml(s)}</li>`).join("")}
+              </ul>
+            </div>
+          </div>
+
+          <div class="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="text-sm font-medium text-zinc-100">2순위 성향</div>
+                <div class="mt-1 text-sm text-zinc-300">
+                  <span class="text-zinc-200 font-medium">${escapeHtml(second.name)}</span> 기질도 강해요.
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button id="copyBtn" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-200 hover:bg-white/10 active:scale-[.99] transition">
+                  공유 링크 복사
+                </button>
+                <button id="againBtn" class="rounded-2xl bg-indigo-500/90 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 active:scale-[.99] transition">
+                  다시하기
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-4 text-xs text-zinc-400 break-all">
+              ${escapeHtml(shareUrl)}
+            </div>
+            <div id="copyToast" class="mt-3 hidden text-xs text-emerald-300">복사 완료!</div>
+          </div>
+
+          <div class="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div class="text-sm font-medium text-zinc-100">점수 랭킹</div>
+            <div class="mt-3 space-y-2">
+              ${ranking.map(r => {
+                const max = ranking[0].score || 1;
+                const pct = Math.round((r.score / max) * 100);
+                return `
+                  <div class="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div class="flex items-center justify-between">
+                      <div class="text-sm text-zinc-200 font-medium">${escapeHtml(r.name)}</div>
+                      <div class="text-xs text-zinc-400">${r.score} pts</div>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full progress-track">
+                      <div class="h-2 rounded-full progress-fill" style="width:${clamp(pct, 0, 100)}%"></div>
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("copyBtn").addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          const t = document.getElementById("copyToast");
+          t.classList.remove("hidden");
+          setTimeout(() => t.classList.add("hidden"), 1400);
+        } catch (e) {
+          alert("복사 실패! 주소를 직접 선택해 복사해 주세요.");
+        }
+      });
+
+      document.getElementById("againBtn").addEventListener("click", () => {
+        state.step = 0;
+        state.answers = {};
+        resetScores();
+        history.replaceState(null, "", location.pathname); // hash 제거
+        render();
+      });
+    }
+
+    function render() {
+      setProgress();
+      renderSummary();
+
+      prevBtn.disabled = state.step === 0;
+      if (state.step < QUESTIONS.length) {
+        // question step
+        renderQuestionStep(state.step);
+
+        const q = QUESTIONS[state.step];
+        nextBtn.textContent = (state.step === QUESTIONS.length - 1) ? "결과 보기" : "다음";
+        nextBtn.disabled = !state.answers[q.id];
+      } else {
+        // result
+        renderResult();
+        nextBtn.textContent = "완료";
+        nextBtn.disabled = true;
+        prevBtn.disabled = true;
+      }
+    }
+
+    // -----------------------------
+    // Navigation
+    // -----------------------------
+    prevBtn.addEventListener("click", () => {
+      if (state.step > 0) state.step--;
+      render();
+    });
+
+    nextBtn.addEventListener("click", () => {
+      if (state.step < QUESTIONS.length) {
+        const q = QUESTIONS[state.step];
+        if (!state.answers[q.id]) return;
+        state.step++;
+        render();
+      }
+    });
+
+    resetBtn.addEventListener("click", () => {
+      state.step = 0;
+      state.answers = {};
+      resetScores();
+      history.replaceState(null, "", location.pathname);
+      render();
+    });
+
+    // -----------------------------
+    // Load from share hash
+    // -----------------------------
+    function tryLoadFromHash() {
+      const hash = location.hash || "";
+      const m = hash.match(/#r=([^&]+)/);
+      if (!m) return;
+      try {
+        const raw = decodeURIComponent(escape(atob(m[1])));
+        const obj = JSON.parse(raw);
+        if (obj?.answers && typeof obj.answers === "object") {
+          state.answers = obj.answers;
+          // jump to result
+          state.step = QUESTIONS.length;
+          render();
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    // -----------------------------
+    // Starfield
+    // -----------------------------
+    function startStars() {
+      const canvas = document.getElementById("stars");
+      const ctx = canvas.getContext("2d");
+      let w, h, dpr;
+      const stars = [];
+      const STAR_COUNT = 140;
+
+      function resize() {
+        dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+        w = canvas.width = Math.floor(innerWidth * dpr);
+        h = canvas.height = Math.floor(innerHeight * dpr);
+        canvas.style.width = innerWidth + "px";
+        canvas.style.height = innerHeight + "px";
+      }
+
+      function rand(min, max) { return Math.random() * (max - min) + min; }
+
+      function init() {
+        stars.length = 0;
+        for (let i = 0; i < STAR_COUNT; i++) {
+          stars.push({
+            x: rand(0, w),
+            y: rand(0, h),
+            r: rand(0.6, 1.8) * dpr,
+            a: rand(0.15, 0.9),
+            vx: rand(-0.08, 0.08) * dpr,
+            vy: rand(0.15, 0.55) * dpr
+          });
+        }
+      }
+
+      function tick() {
+        ctx.clearRect(0, 0, w, h);
+        // glow dust
+        for (const s of stars) {
+          s.x += s.vx;
+          s.y += s.vy;
+
+          if (s.y > h + 10) { s.y = -10; s.x = rand(0, w); }
+          if (s.x < -10) s.x = w + 10;
+          if (s.x > w + 10) s.x = -10;
+
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+          ctx.fill();
+        }
+        requestAnimationFrame(tick);
+      }
+
+      resize();
+      init();
+      tick();
+      window.addEventListener("resize", () => { resize(); init(); });
+    }
+
+    // -----------------------------
+    // Boot
+    // -----------------------------
+    startStars();
+    tryLoadFromHash();
+    render();
+  </script>
 </body>
 </html>
